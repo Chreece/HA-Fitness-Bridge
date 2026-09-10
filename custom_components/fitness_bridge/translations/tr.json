@@ -1,0 +1,34 @@
+{
+  "title": "Fitness Server Köprüsü",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Home Assistant’ı Fitness Server’a bağla",
+        "description": "Home Assistant’ı bağımsız Fitness Server için isteğe bağlı bir modül olarak bağlar. Akıllı ev G/Ç ve salt okunur Fitness varlık yansıtması sınırlı köprü yetenekleridir; bu entegrasyon devre dışı veya kullanılamaz olsa da Fitness tamamen çalışmaya devam eder.",
+        "data": {
+          "server_ws_url": "Fitness Server köprüsü WebSocket URL’si",
+          "bridge_token": "Köprü belirteci",
+          "allowed_service_domains": "İzin verilen HA hizmet alanları (virgülle ayrılmış)",
+          "entity_mirror_enabled": "Fitness sensörlerini Home Assistant’a yansıt"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "Köprü URL’sini, belirteci ve hizmet alanlarını kontrol edin."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Köprü izinleri",
+        "data": {
+          "allowed_service_domains": "İzin verilen HA hizmet alanları (virgülle ayrılmış)",
+          "entity_mirror_enabled": "Fitness sensörlerini Home Assistant’a yansıt"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "Köprü URL’sini, belirteci ve hizmet alanlarını kontrol edin."
+    }
+  }
+}

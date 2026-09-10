@@ -1,0 +1,34 @@
+{
+  "title": "Most Fitness Server",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Połącz Home Assistant z Fitness Server",
+        "description": "Łączy Home Assistant jako opcjonalny moduł z samodzielnym Fitness Server. Wejścia/wyjścia smart home i lustrzane encje Fitness tylko do odczytu są ograniczonymi funkcjami mostu; Fitness działa w pełni także wtedy, gdy integracja jest wyłączona lub niedostępna.",
+        "data": {
+          "server_ws_url": "Adres WebSocket mostu Fitness Server",
+          "bridge_token": "Token mostu",
+          "allowed_service_domains": "Dozwolone domeny usług HA (oddzielone przecinkami)",
+          "entity_mirror_enabled": "Lustrzane sensory Fitness w Home Assistant"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "Sprawdź adres mostu, token i domeny usług."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Uprawnienia mostu",
+        "data": {
+          "allowed_service_domains": "Dozwolone domeny usług HA (oddzielone przecinkami)",
+          "entity_mirror_enabled": "Lustrzane sensory Fitness w Home Assistant"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "Sprawdź adres mostu, token i domeny usług."
+    }
+  }
+}

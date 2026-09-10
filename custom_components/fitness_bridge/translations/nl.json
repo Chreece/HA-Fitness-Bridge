@@ -1,0 +1,34 @@
+{
+  "title": "Fitness Server Bridge",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Home Assistant verbinden met Fitness Server",
+        "description": "Verbindt Home Assistant als optionele module met de zelfstandige Fitness Server. Smart-home-I/O en alleen-lezen spiegeling van Fitness-entiteiten zijn begrensde bridgefuncties; Fitness blijft volledig werken als deze integratie is uitgeschakeld of niet beschikbaar is.",
+        "data": {
+          "server_ws_url": "WebSocket-URL van Fitness Server-bridge",
+          "bridge_token": "Bridge-token",
+          "allowed_service_domains": "Toegestane HA-servicedomeinen (door komma’s gescheiden)",
+          "entity_mirror_enabled": "Fitness-sensoren spiegelen naar Home Assistant"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "Controleer de bridge-URL, het token en de servicedomeinen."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Bridge-machtigingen",
+        "data": {
+          "allowed_service_domains": "Toegestane HA-servicedomeinen (door komma’s gescheiden)",
+          "entity_mirror_enabled": "Fitness-sensoren spiegelen naar Home Assistant"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "Controleer de bridge-URL, het token en de servicedomeinen."
+    }
+  }
+}

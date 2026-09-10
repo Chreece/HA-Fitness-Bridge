@@ -1,0 +1,34 @@
+{
+  "title": "Fitness Server 桥接",
+  "config": {
+    "step": {
+      "user": {
+        "title": "将 Home Assistant 连接到 Fitness Server",
+        "description": "将 Home Assistant 作为独立 Fitness Server 的可选模块连接。智能家居 I/O 和只读 Fitness 实体镜像都是受限的桥接能力；即使此集成被禁用或不可用，Fitness 仍会完整运行。",
+        "data": {
+          "server_ws_url": "Fitness Server 桥接 WebSocket URL",
+          "bridge_token": "桥接令牌",
+          "allowed_service_domains": "允许的 HA 服务域（逗号分隔）",
+          "entity_mirror_enabled": "将 Fitness 传感器镜像到 Home Assistant"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "请检查桥接 URL、令牌和服务域。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "桥接权限",
+        "data": {
+          "allowed_service_domains": "允许的 HA 服务域（逗号分隔）",
+          "entity_mirror_enabled": "将 Fitness 传感器镜像到 Home Assistant"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "请检查桥接 URL、令牌和服务域。"
+    }
+  }
+}

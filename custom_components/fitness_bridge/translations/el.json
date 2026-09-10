@@ -1,0 +1,34 @@
+{
+  "title": "Γέφυρα Fitness Server",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Σύνδεση του Home Assistant με το Fitness Server",
+        "description": "Συνδέει το Home Assistant ως προαιρετικό module με το αυτόνομο Fitness Server. Οι λειτουργίες smart-home I/O και ο κατοπτρισμός οντοτήτων Fitness μόνο για ανάγνωση είναι περιορισμένες δυνατότητες της γέφυρας· το Fitness συνεχίζει να λειτουργεί πλήρως όταν η ενσωμάτωση είναι απενεργοποιημένη ή μη διαθέσιμη.",
+        "data": {
+          "server_ws_url": "WebSocket URL γέφυρας Fitness Server",
+          "bridge_token": "Token γέφυρας",
+          "allowed_service_domains": "Επιτρεπόμενα domains υπηρεσιών HA (χωρισμένα με κόμμα)",
+          "entity_mirror_enabled": "Κατοπτρισμός αισθητήρων Fitness στο Home Assistant"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "Ελέγξτε το URL της γέφυρας, το token και τα domains υπηρεσιών."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Δικαιώματα γέφυρας",
+        "data": {
+          "allowed_service_domains": "Επιτρεπόμενα domains υπηρεσιών HA (χωρισμένα με κόμμα)",
+          "entity_mirror_enabled": "Κατοπτρισμός αισθητήρων Fitness στο Home Assistant"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "Ελέγξτε το URL της γέφυρας, το token και τα domains υπηρεσιών."
+    }
+  }
+}

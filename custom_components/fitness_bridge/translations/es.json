@@ -1,0 +1,34 @@
+{
+  "title": "Puente de Fitness Server",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Conectar Home Assistant a Fitness Server",
+        "description": "Conecta Home Assistant como módulo opcional del Fitness Server autónomo. La E/S del hogar inteligente y el reflejo de entidades de Fitness en modo solo lectura son capacidades limitadas del puente; Fitness sigue funcionando por completo si esta integración está desactivada o no disponible.",
+        "data": {
+          "server_ws_url": "URL WebSocket del puente de Fitness Server",
+          "bridge_token": "Token del puente",
+          "allowed_service_domains": "Dominios de servicio de HA permitidos (separados por comas)",
+          "entity_mirror_enabled": "Reflejar sensores de Fitness en Home Assistant"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "Comprueba la URL del puente, el token y los dominios de servicio."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Permisos del puente",
+        "data": {
+          "allowed_service_domains": "Dominios de servicio de HA permitidos (separados por comas)",
+          "entity_mirror_enabled": "Reflejar sensores de Fitness en Home Assistant"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "Comprueba la URL del puente, el token y los dominios de servicio."
+    }
+  }
+}

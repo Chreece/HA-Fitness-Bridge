@@ -1,0 +1,34 @@
+{
+  "title": "Fitness Server Bridge",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect Home Assistant to Fitness Server",
+        "description": "Connect Home Assistant as an optional module for standalone Fitness. Smart-home I/O and read-only Fitness entity mirroring are bounded bridge capabilities; Fitness remains fully operational when this integration is disabled or unavailable.",
+        "data": {
+          "server_ws_url": "Fitness Server bridge WebSocket URL",
+          "bridge_token": "Bridge token",
+          "allowed_service_domains": "Allowed HA service domains (comma-separated)",
+          "entity_mirror_enabled": "Mirror Fitness sensors into Home Assistant"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "Check the bridge URL, token and service domains."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Bridge permissions",
+        "data": {
+          "allowed_service_domains": "Allowed HA service domains (comma-separated)",
+          "entity_mirror_enabled": "Mirror Fitness sensors into Home Assistant"
+        }
+      }
+    },
+    "error": {
+      "invalid_config": "Enter at least one valid service domain."
+    }
+  }
+}
