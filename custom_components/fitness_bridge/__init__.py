@@ -5,7 +5,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .client import FitnessBridgeClient
+from .capability_client import CapabilityAdvertisingFitnessBridgeClient
 from .const import (
     CONF_ALLOWED_SERVICE_DOMAINS,
     CONF_BRIDGE_TOKEN,
@@ -18,7 +18,7 @@ from .const import (
 _PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 
-def _client_from_entry(hass: HomeAssistant, entry: ConfigEntry) -> FitnessBridgeClient:
+def _client_from_entry(hass: HomeAssistant, entry: ConfigEntry) -> CapabilityAdvertisingFitnessBridgeClient:
     raw_domains = entry.options.get(
         CONF_ALLOWED_SERVICE_DOMAINS,
         entry.data.get(CONF_ALLOWED_SERVICE_DOMAINS, list(DEFAULT_ALLOWED_SERVICE_DOMAINS)),
@@ -28,7 +28,7 @@ def _client_from_entry(hass: HomeAssistant, entry: ConfigEntry) -> FitnessBridge
         for value in (raw_domains if isinstance(raw_domains, list) else DEFAULT_ALLOWED_SERVICE_DOMAINS)
         if str(value).strip()
     }
-    return FitnessBridgeClient(
+    return CapabilityAdvertisingFitnessBridgeClient(
         hass,
         url=str(entry.data[CONF_SERVER_WS_URL]),
         token=str(entry.data.get(CONF_BRIDGE_TOKEN) or ""),
@@ -45,7 +45,7 @@ def _client_from_entry(hass: HomeAssistant, entry: ConfigEntry) -> FitnessBridge
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up one outbound bridge connection.
 
-    Fitness Server remains authoritative.  Loading this config entry must not
+    Fitness Server remains authoritative. Loading this config entry must not
     require Fitness Server to be reachable: the client reconnects in the
     background and mirrored entities simply remain unavailable meanwhile.
     """
