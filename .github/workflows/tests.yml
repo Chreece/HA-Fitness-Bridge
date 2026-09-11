@@ -1,0 +1,40 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile integration sources
+        run: python -m compileall -q custom_components/fitness_bridge
+      - name: Verify exact capability advertisement wiring
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('custom_components/fitness_bridge')
+          manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
+          assert manifest['version'] == '0.30.0a2'
+
+          init = (root / '__init__.py').read_text(encoding='utf-8')
+          capability = (root / 'capability_client.py').read_text(encoding='utf-8')
+          client = (root / 'client.py').read_text(encoding='utf-8')
+
+          assert 'CapabilityAdvertisingFitnessBridgeClient' in init
+          assert '"service_domains": sorted(self.allowed_service_domains)' in capability
+          assert 'domain not in self.allowed_service_domains' in client
+          assert '"runtime_catalog"' in capability
+          assert '"entity_mirror"' in capability
+          print('PASS exact HA-Fitness Bridge capability advertisement')
+          PY
