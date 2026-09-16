@@ -2,7 +2,7 @@
   "title": "Pont Fitness Server",
   "config": {
     "step": {
-      "user": {
+      "manual": {
         "title": "Connecter Home Assistant à Fitness Server",
         "description": "Connecte Home Assistant comme module facultatif au Fitness Server autonome. Les E/S domotiques et la réplication en lecture seule des entités Fitness sont des capacités limitées du pont ; Fitness continue de fonctionner entièrement si cette intégration est désactivée ou indisponible.",
         "data": {
@@ -10,6 +10,14 @@
           "bridge_token": "Jeton du pont",
           "allowed_service_domains": "Domaines de services HA autorisés (séparés par des virgules)",
           "entity_mirror_enabled": "Répliquer les capteurs Fitness dans Home Assistant"
+        }
+      },
+      "user": {
+        "title": "Connect Fitness Server",
+        "description": "Choose OAuth setup from Fitness, or an advanced manual connection.",
+        "menu_options": {
+          "pair": "Connect from Fitness (OAuth)",
+          "manual": "Advanced manual connection"
         }
       }
     },

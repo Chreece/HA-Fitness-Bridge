@@ -1,63 +1,39 @@
-# HA-Fitness Bridge — optional Home Assistant module
+# HA-Fitness Bridge 0.31.0a1
 
-This directory is the separately installable Home Assistant module for **standalone Fitness Server**. Home Assistant is not part of Fitness: it may be installed, disabled, restarted, disconnected or removed without affecting Fitness accounts, workouts, device ingestion, dashboards, cloud sync, media, speech, Circle or storage.
+Optional Home Assistant integration for standalone Fitness Server 0.80.0a31.
+Fitness accounts, workouts, storage, device ingestion and native features stay independent of Home Assistant.
 
-The bridge owns only bounded HA-specific I/O:
+## Test installation
 
-- read-only mirroring of Fitness-owned sensor projections;
-- bounded HA area/entity catalogs used by Fitness when HA is connected;
-- allow-listed HA service calls for smart-home output;
-- exact-target Cast launch/stop;
-- workout-light output and optional HA speaker/TTS fallback.
+Run `bash tools/install_bridge_a31.sh /config` on the HA host, passing the actual Home Assistant configuration directory. The self-contained installer creates a backup of only the existing `custom_components/fitness_bridge` directory, installs this matched bridge, and prints the backup location. Restart Home Assistant afterward. It does not modify the legacy `fitness` integration.
 
-Fitness Server remains the source of truth and independently re-checks service domains and entity/cast boundaries.
+In Home Assistant, add **Fitness Server Bridge** and choose **Connect from Fitness (OAuth)**. In Fitness Admin → Settings → Fitness features → Home Assistant bridge, open **Connect with Home Assistant**, enter the HA and Fitness origins, then sign in as an HA administrator in the popup. Existing bridge entries can be reconnected. Fitness must be reachable from HA at the supplied address.
 
-## Installable bridge artifact
+The OAuth callback and temporary HA tokens stay on the HA origin and the grant is revoked after pairing. HA stores only the Fitness-issued credential for its outbound bridge connection; Fitness stores its hash. The admin browser does not have to stay open. A five-minute setup ticket is single-use and bound to a still-authorized Fitness administrator session.
 
-Run from the repository root:
+After pairing, use the Fitness admin section to allow users and features, choose approved entities/areas/providers, and set defaults and user-selection permissions. Nothing is granted to users automatically. Users then open **Settings → Home Assistant**, separately from Profile settings. HA access stays local-network only.
 
-```bash
-python tools/build_ha_bridge.py --output HA-Fitness-Bridge.zip
-```
+## Capabilities
 
-The deterministic archive contains:
+- Workout color-light feedback and any approved HA TTS entity/speaker.
+- Approved training areas with independent room following for lights, TTS and music, and destination selection for the next Cast launch.
+- Audio browsing/playback through approved HA Media Source roots and `play_media` players. Music Assistant players can be selected when they expose that HA capability; not every provider library has a Media Source adapter.
+- Music room handoff restarts only playback started by Fitness and still identified as that item on the previous player. Other playback remains untouched; queues/position are not transferred.
+- Explicit `ai_task.generate_data` entities; no generic conversation-agent home control.
+- Read-only selected numeric sensors from installed supported fitness-provider integrations. This does not import workout history or add cloud accounts. Configure provider accounts in HA.
+- Existing Cast launch/stop and optional read-only Fitness sensor mirrors.
 
-```text
-custom_components/fitness_bridge/
-hacs.json
-README.md
-```
+## Manual setup and independent domain controls
 
-It can be unpacked into a Home Assistant configuration directory for the parallel/cutover validation stage. The bridge currently keeps the `fitness_bridge` domain deliberately separate from the legacy monolithic `fitness` domain so both can coexist during migration rehearsal. The legacy `custom_components/fitness` tree is not modified by this package.
+Advanced manual setup remains available with a `ws://` or `wss://` Fitness bridge URL and matching `FITNESS_HA_BRIDGE_TOKEN`. Public destinations require WSS and a token of at least 24 characters. LAN IPs and `.local` hosts also permit WS.
 
-## Configuration
+The HA Configure options retain an independent service-domain allowlist. Existing manual entries may need `ai_task` added to enable AI. The connection handshake now advertises those domains. Fitness applies its own allowlist; neither `fitness` nor `fitness_bridge` can be delegated.
 
-Default local WebSocket endpoint:
+## Tests and acceptance
 
-```text
-ws://127.0.0.1:8732/api/v1/bridge/home-assistant
-```
+Run `python -m pytest -q tests` and `node tests/test_pairing_browser.cjs`.
+The tests exercise production protocol definitions using HA service/registry doubles and the actual OAuth script using browser/network doubles. The matched Fitness repository includes HTTP/WebSocket and real Chromium acceptance tests.
 
-The bridge token must match `FITNESS_HA_BRIDGE_TOKEN` when configured on Fitness Server. Plain `ws://` is accepted only for loopback/private/link-local or `.local` destinations. Public/non-local endpoints require `wss://` and a bridge token of at least 24 characters.
+A live HA Core installation and physical devices were not available in the build environment. Install both test builds and verify HA OAuth, one TTS utterance, one light cue, room changes, media playback, revocation and restart behavior on your installation before adopting this build.
 
-The Home Assistant service-domain list is configurable but may not delegate the `fitness` or `fitness_bridge` domains. Fitness Server applies its own fixed allow-list again, so the HA-side option cannot broaden server authority.
-
-## Home Assistant lifecycle contract
-
-The bridge follows the current config-entry style used by Home Assistant 2026.8/2026.9:
-
-- `ConfigEntry.runtime_data` owns the live bridge client;
-- `Platform.SENSOR` is used for platform forwarding;
-- setup starts the reconnecting client and forwards the sensor platform;
-- unload first unloads the platform, then stops the bridge client;
-- options reload the entry through its update listener;
-- mirrored sensors read only from `entry.runtime_data`;
-- diagnostics are bounded and never include the bridge URL/token or Fitness credentials.
-
-The bridge is translated into the same 15 languages currently supported by HA-Fitness: de, el, en, es, fr, it, ja, ko, nl, pl, pt, ru, tr, uk and zh.
-
-## Validation status
-
-The repository includes a Home Assistant lifecycle contract harness covering config-entry setup/reload/unload, runtime data, sensor creation, diagnostics and bridge packaging. The API shape was also checked against current Home Assistant developer/core sources.
-
-A full Home Assistant runtime is not installed in the migration build environment, so the packaged source does not falsely claim an in-build HA Core boot. Phase 21 closes the production gate operationally instead: configure this bridge alongside legacy `fitness`, create the final frozen migration snapshot, retire the legacy integration with `fitness-server-deploy ha-bridge-finalize`, start the real Home Assistant installation, then run `fitness-server-deploy ha-bridge-verify`. That verification succeeds only when the running bridge has actually connected to Fitness Server. The exact pre-retirement HA state can be restored with `ha-bridge-rollback` while HA is stopped.
+Official references: [HA auth](https://developers.home-assistant.io/docs/auth_api/), [WebSocket API](https://developers.home-assistant.io/docs/api/websocket/), [AI Task](https://www.home-assistant.io/integrations/ai_task/).

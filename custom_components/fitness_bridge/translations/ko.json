@@ -2,7 +2,7 @@
   "title": "Fitness Server 브리지",
   "config": {
     "step": {
-      "user": {
+      "manual": {
         "title": "Home Assistant를 Fitness Server에 연결",
         "description": "Home Assistant를 독립형 Fitness Server의 선택적 모듈로 연결합니다. 스마트 홈 I/O와 읽기 전용 Fitness 엔터티 미러링은 제한된 브리지 기능이며, 이 통합이 비활성화되거나 사용할 수 없어도 Fitness는 완전히 계속 작동합니다.",
         "data": {
@@ -10,6 +10,14 @@
           "bridge_token": "브리지 토큰",
           "allowed_service_domains": "허용된 HA 서비스 도메인(쉼표로 구분)",
           "entity_mirror_enabled": "Fitness 센서를 Home Assistant에 미러링"
+        }
+      },
+      "user": {
+        "title": "Connect Fitness Server",
+        "description": "Choose OAuth setup from Fitness, or an advanced manual connection.",
+        "menu_options": {
+          "pair": "Connect from Fitness (OAuth)",
+          "manual": "Advanced manual connection"
         }
       }
     },

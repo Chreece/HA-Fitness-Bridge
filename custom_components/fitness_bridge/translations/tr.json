@@ -2,7 +2,7 @@
   "title": "Fitness Server Köprüsü",
   "config": {
     "step": {
-      "user": {
+      "manual": {
         "title": "Home Assistant’ı Fitness Server’a bağla",
         "description": "Home Assistant’ı bağımsız Fitness Server için isteğe bağlı bir modül olarak bağlar. Akıllı ev G/Ç ve salt okunur Fitness varlık yansıtması sınırlı köprü yetenekleridir; bu entegrasyon devre dışı veya kullanılamaz olsa da Fitness tamamen çalışmaya devam eder.",
         "data": {
@@ -10,6 +10,14 @@
           "bridge_token": "Köprü belirteci",
           "allowed_service_domains": "İzin verilen HA hizmet alanları (virgülle ayrılmış)",
           "entity_mirror_enabled": "Fitness sensörlerini Home Assistant’a yansıt"
+        }
+      },
+      "user": {
+        "title": "Connect Fitness Server",
+        "description": "Choose OAuth setup from Fitness, or an advanced manual connection.",
+        "menu_options": {
+          "pair": "Connect from Fitness (OAuth)",
+          "manual": "Advanced manual connection"
         }
       }
     },

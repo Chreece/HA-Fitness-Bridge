@@ -5,6 +5,7 @@ CONF_ALLOWED_SERVICE_DOMAINS = "allowed_service_domains"
 
 DEFAULT_SERVER_WS_URL = "ws://127.0.0.1:8732/api/v1/bridge/home-assistant"
 DEFAULT_ALLOWED_SERVICE_DOMAINS = (
+    "ai_task",
     "calendar",
     "light",
     "media_player",

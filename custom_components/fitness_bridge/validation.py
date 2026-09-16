@@ -15,6 +15,9 @@ def normalize_ws_url(value: str) -> str:
         raise ValueError("A ws:// or wss:// Fitness bridge URL is required")
     if parsed.username or parsed.password or parsed.fragment or parsed.query:
         raise ValueError("Bridge URL must not contain credentials, query parameters or a fragment")
+    parsed.port
+    if any(char.isspace() for char in raw):
+        raise ValueError("Invalid bridge URL")
     host = parsed.hostname.strip().lower()
     if parsed.scheme == "ws" and not _is_local_host(host):
         raise ValueError("Public/non-local Fitness bridge URLs require wss://")

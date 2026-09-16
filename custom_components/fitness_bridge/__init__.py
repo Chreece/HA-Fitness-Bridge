@@ -6,6 +6,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .client import FitnessBridgeClient
+from .pairing import register_pairing
 from .const import (
     CONF_ALLOWED_SERVICE_DOMAINS,
     CONF_BRIDGE_TOKEN,
@@ -16,6 +17,11 @@ from .const import (
 )
 
 _PLATFORMS: list[Platform] = [Platform.SENSOR]
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    register_pairing(hass)
+    return True
 
 
 def _client_from_entry(hass: HomeAssistant, entry: ConfigEntry) -> FitnessBridgeClient:
@@ -52,7 +58,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     client = _client_from_entry(hass, entry)
     entry.runtime_data = client
     try:
-        await client.async_start()
+        register_pairing(hass)
+        if entry.data.get(CONF_SERVER_WS_URL):
+            await client.async_start()
         await hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
     except Exception:
         await client.async_stop()

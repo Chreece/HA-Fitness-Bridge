@@ -2,7 +2,7 @@
   "title": "Fitness Server ブリッジ",
   "config": {
     "step": {
-      "user": {
+      "manual": {
         "title": "Home Assistant を Fitness Server に接続",
         "description": "Home Assistant をスタンドアロン Fitness Server のオプションモジュールとして接続します。スマートホーム I/O と Fitness エンティティの読み取り専用ミラーリングは制限されたブリッジ機能です。この統合が無効または利用不可でも Fitness は完全に動作し続けます。",
         "data": {
@@ -10,6 +10,14 @@
           "bridge_token": "ブリッジトークン",
           "allowed_service_domains": "許可する HA サービスドメイン（カンマ区切り）",
           "entity_mirror_enabled": "Fitness センサーを Home Assistant にミラーリング"
+        }
+      },
+      "user": {
+        "title": "Connect Fitness Server",
+        "description": "Choose OAuth setup from Fitness, or an advanced manual connection.",
+        "menu_options": {
+          "pair": "Connect from Fitness (OAuth)",
+          "manual": "Advanced manual connection"
         }
       }
     },

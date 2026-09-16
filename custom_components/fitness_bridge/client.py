@@ -6,6 +6,7 @@ from collections.abc import Callable
 import ipaddress
 import json
 import logging
+import math
 import re
 import time
 from typing import Any
@@ -84,13 +85,13 @@ def _area_id_for(hass: HomeAssistant, entity_id: str) -> str:
 
 def _runtime_catalog(hass: HomeAssistant) -> dict[str, Any]:
     """Build the small smart-home catalog Fitness is allowed to see."""
-    ai_rows: list[dict[str, Any]] = [{"id": "__home_assistant_default__", "name": "Home Assistant system default"}]
-    seen = {"__home_assistant_default__"}
+    ai_rows: list[dict[str, Any]] = []
+    seen = set()
     for state in sorted(hass.states.async_all(), key=lambda item: item.entity_id):
         entity_id = str(state.entity_id or "")
-        if not entity_id.startswith(("ai_task.", "conversation.")) or entity_id in seen:
+        if not entity_id.startswith("ai_task.") or entity_id in seen:
             continue
-        if str(state.state or "") in {"unavailable", "unknown"}:
+        if str(state.state or "") == "unavailable":
             continue
         seen.add(entity_id)
         ai_rows.append({"id": entity_id, "entity_id": entity_id, "name": str(state.attributes.get("friendly_name") or getattr(state, "name", "") or entity_id)[:256], "state": str(state.state or "")[:64], "available": True})
@@ -102,12 +103,9 @@ def _runtime_catalog(hass: HomeAssistant) -> dict[str, Any]:
         registry_entry = entity_registry.async_get(entity_id)
         if registry_entry is not None and registry_entry.disabled_by is not None:
             continue
-        if str(state.state or "") in {"unavailable", "unknown"}:
+        if str(state.state or "") == "unavailable":
             continue
         platform = str(getattr(registry_entry, "platform", "") or "")[:64] if registry_entry is not None else ""
-        label = f"{entity_id} {state.attributes.get('friendly_name') or ''}".lower()
-        if platform not in {"wyoming", "piper"} and "piper" not in label:
-            continue
         supported = state.attributes.get("supported_languages")
         supported_languages = [str(item)[:32] for item in list(supported or [])[:128] if str(item).strip()] if isinstance(supported, (list, tuple, set)) else []
         tts_rows.append({
@@ -169,10 +167,31 @@ def _runtime_catalog(hass: HomeAssistant) -> dict[str, Any]:
 
     areas = [{"id": str(area.id)[:128], "name": str(area.name)[:256]} for area in ar.async_get(hass).async_list_areas()]
     areas.sort(key=lambda row: str(row.get("name") or "").casefold())
+    integrations, sensors = [], []
+    fitness_domains = {"garmin_connect", "garmin", "polar", "fitbit", "withings", "oura", "whoop", "suunto", "strava", "health_connect", "apple_health"}
+    for entry in hass.config_entries.async_entries():
+        if entry.domain not in fitness_domains:
+            continue
+        integrations.append({"id": entry.entry_id, "name": str(entry.title)[:256], "platform": entry.domain})
+        for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
+            if entity.disabled_by is not None or not entity.entity_id.startswith("sensor."):
+                continue
+            state = hass.states.get(entity.entity_id)
+            if state is None:
+                continue
+            try:
+                if not math.isfinite(float(state.state)):
+                    continue
+            except (TypeError, ValueError):
+                continue
+            sensors.append({"id": entity.entity_id, "entity_id": entity.entity_id,
+                "integration_id": entry.entry_id, "name": str(state.attributes.get("friendly_name") or entity.entity_id)[:256],
+                "unit": str(state.attributes.get("unit_of_measurement") or "")[:32], "available": True})
     return {
         "ai_entities": ai_rows[:512], "areas": areas[:1024],
         "tts_entities": tts_rows[:256], "tts_media_players": media_rows[:2048], "music_media_players": music_rows[:2048],
         "cast_media_players": cast_rows[:1024], "lights": light_rows[:4096],
+        "integrations": integrations[:512], "integration_entities": sensors[:2048],
     }
 
 
@@ -348,6 +367,7 @@ class FitnessBridgeClient:
         self._mirror_entities: dict[str, dict[str, Any]] = {}
         self._mirror_profile_entities: dict[str, set[str]] = {}
         self._mirror_listeners: set[Callable[[], None]] = set()
+        self._fitness_playback: dict[str, tuple[str, str]] = {}
 
     @property
     def connected(self) -> bool:
@@ -453,7 +473,9 @@ class FitnessBridgeClient:
                     autoclose=True,
                 ) as ws:
                     self._ws = ws
-                    capabilities = ["states", "services", "events", "runtime_catalog", "cast_launch"]
+                    capabilities = ["states", "services", "events", "runtime_catalog", "cast_launch", "media_source", "integration_read"]
+                    if "ai_task" in self.allowed_service_domains and self.hass.services.has_service("ai_task", "generate_data"):
+                        capabilities.append("ai_task")
                     if self.entity_mirror_enabled:
                         capabilities.append("entity_mirror")
                     await ws.send_json(
@@ -462,6 +484,7 @@ class FitnessBridgeClient:
                             "protocol": PROTOCOL_VERSION,
                             "instance_id": str(getattr(self.hass, "instance_id", "") or "home-assistant"),
                             "capabilities": capabilities,
+                            "service_domains": sorted(self.allowed_service_domains),
                             "token": self.token,
                         }
                     )
@@ -478,6 +501,7 @@ class FitnessBridgeClient:
                     # prevents a profile deleted while disconnected from reappearing
                     # from stale HA-side memory after reconnect.
                     self._mirror_entities.clear()
+                    self._fitness_playback.clear()
                     self._mirror_profile_entities.clear()
                     self._notify_mirror_listeners()
                     async for message in ws:
@@ -538,6 +562,28 @@ class FitnessBridgeClient:
                 result = {"subscribed": sorted(self._subscriptions)}
             elif operation == "catalog/runtime":
                 result = _runtime_catalog(self.hass)
+                result["music_providers"] = await self._music_sources()
+            elif operation == "ai/generate":
+                entity_id = str(request.get("entity_id") or "")
+                instructions = str(request.get("instructions") or "")
+                if "ai_task" not in self.allowed_service_domains or not entity_id.startswith("ai_task."):
+                    raise PermissionError("AI task service is not allowed")
+                if not self.hass.states.get(entity_id) or not 1 <= len(instructions) <= 8000:
+                    raise ValueError("Invalid AI task")
+                result = await self.hass.services.async_call("ai_task", "generate_data", {
+                    "entity_id": entity_id, "task_name": "Fitness user request", "instructions": instructions,
+                }, blocking=True, return_response=True)
+            elif operation == "integration/read":
+                ids = request.get("entity_ids") or []
+                if not isinstance(ids, list) or len(ids) > 256:
+                    raise ValueError("Invalid sensor selection")
+                known = {x["id"]: x for x in _runtime_catalog(self.hass)["integration_entities"]}
+                if any(x not in known for x in ids):
+                    raise PermissionError("Not a supported fitness integration sensor")
+                result = {"sensors": [{"id": x, "name": known[x]["name"], "unit": known[x]["unit"],
+                    "value": float(self.hass.states.get(x).state)} for x in ids]}
+            elif operation in {"media/browse", "media/play", "media/move"}:
+                result = await self._media_operation(operation, request)
             elif operation == "cast/launch_url":
                 entity_id = str(request.get("entity_id") or "").strip().lower()
                 url = str(request.get("url") or "").strip()
@@ -593,6 +639,67 @@ class FitnessBridgeClient:
                 "error": str(err)[:1024],
             }
         await self._send_json(response)
+
+    async def _music_sources(self):
+        from homeassistant.components import media_source
+        try:
+            root = await media_source.async_browse_media(self.hass, None)
+        except Exception:
+            return []
+        rows = []
+        for child in (root.children or [])[:128]:
+            ident = str(child.media_content_id or "")
+            if ident.startswith("media-source://") and not ident.startswith(("media-source://camera", "media-source://tts")):
+                rows.append({"id": ident, "name": str(child.title)[:256], "available": True})
+        return rows
+
+    async def _media_operation(self, operation, request):
+        from homeassistant.components import media_source
+        provider, ident = str(request.get("provider") or ""), str(request.get("media_id") or "")
+        sources = {row["id"] for row in await self._music_sources()}
+        if (provider not in sources or len(ident) > 2048 or "?" in ident or "#" in ident
+                or not (ident == provider or ident.startswith(provider.rstrip("/") + "/"))):
+            raise PermissionError("Invalid music source")
+        if operation == "media/browse":
+            item = await media_source.async_browse_media(self.hass, ident)
+            def row(child):
+                child_id = str(child.media_content_id or "")
+                if not (child_id == provider or child_id.startswith(provider.rstrip("/") + "/")):
+                    return None
+                playable = bool(child.can_play and (str(child.media_content_type).startswith("audio/") or str(child.media_content_type) in {"music", "application/ogg"}))
+                if not child.can_expand and not playable:
+                    return None
+                return {"id": child_id[:2048], "name": str(child.title)[:256], "can_expand": bool(child.can_expand), "can_play": playable}
+            return {"id": ident, "name": str(item.title)[:256], "items": [r for child in (item.children or [])[:256] if (r := row(child))]}
+        if "media_player" not in self.allowed_service_domains:
+            raise PermissionError("Media player service is not allowed")
+        entity_id = str(request.get("entity_id") or "")
+        players = {x["id"] for x in _runtime_catalog(self.hass)["music_media_players"]}
+        if operation == "media/move":
+            previous = str(request.get("from_entity_id") or "")
+            tracked = self._fitness_playback.get(previous)
+            state = self.hass.states.get(previous)
+            if (previous not in players or not tracked or tracked[0] != ident or state is None
+                    or state.state != "playing" or state.attributes.get("media_content_id") not in tracked):
+                return {"moved": False, "reason": "previous_playback_not_owned"}
+            if entity_id and entity_id not in players:
+                raise ValueError("Invalid music player")
+            await self.hass.services.async_call("media_player", "media_stop", {}, target={"entity_id": previous}, blocking=True)
+            self._fitness_playback.pop(previous, None)
+            if not entity_id:
+                return {"moved": False, "stopped": True}
+        if entity_id not in players:
+            raise ValueError("Invalid music player")
+        resolved = await media_source.async_resolve_media(self.hass, ident, entity_id)
+        if not str(resolved.mime_type).startswith("audio/") and resolved.mime_type != "application/ogg":
+            raise PermissionError("Only audio is supported")
+        # Keep resolved URLs (which may contain provider tokens) on HA. Pass the
+        # media-source identifier to HA's player so its integration resolves it.
+        await self.hass.services.async_call("media_player", "play_media", {
+            "media_content_id": ident, "media_content_type": resolved.mime_type,
+        }, target={"entity_id": entity_id}, blocking=True)
+        self._fitness_playback[entity_id] = (ident, str(resolved.url))
+        return {"playing": True, **({"moved": True} if operation == "media/move" else {})}
 
     def _ensure_state_listener(self) -> None:
         if self._state_unsub is not None or not self._subscriptions:
