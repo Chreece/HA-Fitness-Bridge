@@ -474,7 +474,10 @@ class FitnessBridgeClient:
                 ) as ws:
                     self._ws = ws
                     capabilities = ["states", "services", "events", "runtime_catalog", "cast_launch", "media_source", "integration_read"]
-                    if "ai_task" in self.allowed_service_domains and self.hass.services.has_service("ai_task", "generate_data"):
+                    # Advertise the implemented transport operation even if HA
+                    # is still starting integrations. The live catalog below
+                    # gates readiness and can recover without reconnecting.
+                    if "ai_task" in self.allowed_service_domains:
                         capabilities.append("ai_task")
                     if self.entity_mirror_enabled:
                         capabilities.append("entity_mirror")
@@ -562,6 +565,8 @@ class FitnessBridgeClient:
                 result = {"subscribed": sorted(self._subscriptions)}
             elif operation == "catalog/runtime":
                 result = _runtime_catalog(self.hass)
+                if not self.hass.services.has_service("ai_task", "generate_data"):
+                    result["ai_entities"] = []
                 result["music_providers"] = await self._music_sources()
             elif operation == "ai/generate":
                 entity_id = str(request.get("entity_id") or "")
