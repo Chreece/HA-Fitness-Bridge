@@ -1,0 +1,43 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Compile integration
+        run: python -m compileall -q custom_components/fitness_bridge
+      - name: Build deterministic package
+        run: python tools/build_ha_bridge.py --output /tmp/HA-Fitness-Bridge.zip
+      - name: Inspect package
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          archive = Path('/tmp/HA-Fitness-Bridge.zip')
+          assert archive.is_file() and archive.stat().st_size > 0
+          with ZipFile(archive) as zf:
+              names = set(zf.namelist())
+          required = {
+              'custom_components/fitness_bridge/manifest.json',
+              'custom_components/fitness_bridge/__init__.py',
+              'hacs.json',
+              'README.md',
+              'LICENSE',
+          }
+          missing = required - names
+          assert not missing, f'Missing package files: {sorted(missing)}'
+          PY
