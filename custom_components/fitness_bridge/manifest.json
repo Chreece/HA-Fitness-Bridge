@@ -1,14 +1,14 @@
 {
   "domain": "fitness_bridge",
-  "name": "Fitness Server Bridge",
+  "name": "HA-Fitness Bridge",
   "codeowners": [
     "@Chreece"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/Chreece/HA-Fitness",
+  "documentation": "https://github.com/Chreece/HA-Fitness-Bridge",
   "integration_type": "hub",
   "iot_class": "local_push",
   "requirements": [],
   "version": "0.30.0a1",
-  "issue_tracker": "https://github.com/Chreece/HA-Fitness/issues"
+  "issue_tracker": "https://github.com/Chreece/HA-Fitness-Bridge/issues"
 }
