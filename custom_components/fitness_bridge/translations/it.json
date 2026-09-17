@@ -2,7 +2,7 @@
   "title": "Bridge Fitness Server",
   "config": {
     "step": {
-      "user": {
+      "manual": {
         "title": "Connetti Home Assistant a Fitness Server",
         "description": "Collega Home Assistant come modulo opzionale al Fitness Server autonomo. I/O smart home e mirroring in sola lettura delle entità Fitness sono capacità limitate del bridge; Fitness continua a funzionare completamente se questa integrazione è disabilitata o non disponibile.",
         "data": {
@@ -10,6 +10,14 @@
           "bridge_token": "Token del bridge",
           "allowed_service_domains": "Domini dei servizi HA consentiti (separati da virgole)",
           "entity_mirror_enabled": "Esegui il mirroring dei sensori Fitness in Home Assistant"
+        }
+      },
+      "user": {
+        "title": "Connect Fitness Server",
+        "description": "Choose OAuth setup from Fitness, or an advanced manual connection.",
+        "menu_options": {
+          "pair": "Connect from Fitness (OAuth)",
+          "manual": "Advanced manual connection"
         }
       }
     },

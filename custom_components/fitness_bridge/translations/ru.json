@@ -2,7 +2,7 @@
   "title": "Мост Fitness Server",
   "config": {
     "step": {
-      "user": {
+      "manual": {
         "title": "Подключить Home Assistant к Fitness Server",
         "description": "Подключает Home Assistant как необязательный модуль к автономному Fitness Server. Ввод-вывод умного дома и зеркалирование сущностей Fitness только для чтения — ограниченные функции моста; Fitness продолжает полноценно работать, если интеграция отключена или недоступна.",
         "data": {
@@ -10,6 +10,14 @@
           "bridge_token": "Токен моста",
           "allowed_service_domains": "Разрешённые домены служб HA (через запятую)",
           "entity_mirror_enabled": "Зеркалировать датчики Fitness в Home Assistant"
+        }
+      },
+      "user": {
+        "title": "Connect Fitness Server",
+        "description": "Choose OAuth setup from Fitness, or an advanced manual connection.",
+        "menu_options": {
+          "pair": "Connect from Fitness (OAuth)",
+          "manual": "Advanced manual connection"
         }
       }
     },

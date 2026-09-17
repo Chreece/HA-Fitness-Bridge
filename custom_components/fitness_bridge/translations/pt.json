@@ -2,7 +2,7 @@
   "title": "Ponte do Fitness Server",
   "config": {
     "step": {
-      "user": {
+      "manual": {
         "title": "Ligar o Home Assistant ao Fitness Server",
         "description": "Liga o Home Assistant como módulo opcional ao Fitness Server autónomo. A E/S de casa inteligente e o espelhamento apenas de leitura das entidades Fitness são capacidades limitadas da ponte; o Fitness continua a funcionar totalmente se esta integração estiver desativada ou indisponível.",
         "data": {
@@ -10,6 +10,14 @@
           "bridge_token": "Token da ponte",
           "allowed_service_domains": "Domínios de serviço HA permitidos (separados por vírgulas)",
           "entity_mirror_enabled": "Espelhar sensores Fitness no Home Assistant"
+        }
+      },
+      "user": {
+        "title": "Connect Fitness Server",
+        "description": "Choose OAuth setup from Fitness, or an advanced manual connection.",
+        "menu_options": {
+          "pair": "Connect from Fitness (OAuth)",
+          "manual": "Advanced manual connection"
         }
       }
     },
