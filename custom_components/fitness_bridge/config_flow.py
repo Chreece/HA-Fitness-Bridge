@@ -38,6 +38,18 @@ class FitnessBridgeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 2
 
     async def async_step_user(self, user_input=None):
+        return self.async_show_menu(step_id="user", menu_options=["pair", "manual"])
+
+    async def async_step_pair(self, user_input=None):
+        await self.async_set_unique_id("fitness_pairing")
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(title="Fitness Bridge · ready to connect", data={
+            CONF_SERVER_WS_URL: "", CONF_BRIDGE_TOKEN: "",
+            CONF_ALLOWED_SERVICE_DOMAINS: list(DEFAULT_ALLOWED_SERVICE_DOMAINS),
+            CONF_ENTITY_MIRROR_ENABLED: DEFAULT_ENTITY_MIRROR_ENABLED,
+        })
+
+    async def async_step_manual(self, user_input=None):
         errors = {}
         if user_input is not None:
             try:
@@ -60,7 +72,7 @@ class FitnessBridgeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ): bool,
             }
         )
-        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+        return self.async_show_form(step_id="manual", data_schema=schema, errors=errors)
 
     @staticmethod
     def async_get_options_flow(config_entry):
@@ -69,7 +81,7 @@ class FitnessBridgeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class FitnessBridgeOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, config_entry) -> None:
-        self.config_entry = config_entry
+        self._bridge_entry = config_entry
 
     async def async_step_init(self, user_input=None):
         if user_input is not None:
@@ -91,18 +103,18 @@ class FitnessBridgeOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(step_id="init", data_schema=self._schema())
 
     def _schema(self):
-        current = self.config_entry.options.get(
+        current = self._bridge_entry.options.get(
             CONF_ALLOWED_SERVICE_DOMAINS,
-            self.config_entry.data.get(
+            self._bridge_entry.data.get(
                 CONF_ALLOWED_SERVICE_DOMAINS, list(DEFAULT_ALLOWED_SERVICE_DOMAINS)
             ),
         )
         if not isinstance(current, list):
             current = list(DEFAULT_ALLOWED_SERVICE_DOMAINS)
         mirror_enabled = bool(
-            self.config_entry.options.get(
+            self._bridge_entry.options.get(
                 CONF_ENTITY_MIRROR_ENABLED,
-                self.config_entry.data.get(
+                self._bridge_entry.data.get(
                     CONF_ENTITY_MIRROR_ENABLED, DEFAULT_ENTITY_MIRROR_ENABLED
                 ),
             )

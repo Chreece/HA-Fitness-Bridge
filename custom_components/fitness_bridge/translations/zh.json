@@ -2,7 +2,7 @@
   "title": "Fitness Server 桥接",
   "config": {
     "step": {
-      "user": {
+      "manual": {
         "title": "将 Home Assistant 连接到 Fitness Server",
         "description": "将 Home Assistant 作为独立 Fitness Server 的可选模块连接。智能家居 I/O 和只读 Fitness 实体镜像都是受限的桥接能力；即使此集成被禁用或不可用，Fitness 仍会完整运行。",
         "data": {
@@ -10,6 +10,14 @@
           "bridge_token": "桥接令牌",
           "allowed_service_domains": "允许的 HA 服务域（逗号分隔）",
           "entity_mirror_enabled": "将 Fitness 传感器镜像到 Home Assistant"
+        }
+      },
+      "user": {
+        "title": "Connect Fitness Server",
+        "description": "Choose OAuth setup from Fitness, or an advanced manual connection.",
+        "menu_options": {
+          "pair": "Connect from Fitness (OAuth)",
+          "manual": "Advanced manual connection"
         }
       }
     },

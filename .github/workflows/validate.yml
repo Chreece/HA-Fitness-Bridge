@@ -4,22 +4,49 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  bridge:
+  source:
+    name: Source and package
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install test tools
+        run: python -m pip install --disable-pip-version-check pytest
       - name: Compile integration
         run: python -m compileall -q custom_components/fitness_bridge
+      - name: Run bridge protocol tests
+        run: python -m pytest -q tests/test_bridge_contract.py
+      - name: Run browser pairing contract
+        run: node tests/test_pairing_browser.cjs
+      - name: Validate manifest and HACS metadata
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest=json.loads(Path('custom_components/fitness_bridge/manifest.json').read_text())
+          hacs=json.loads(Path('hacs.json').read_text())
+          assert manifest['domain']=='fitness_bridge'
+          assert manifest['name']=='HA-Fitness Bridge'
+          assert manifest['documentation']=='https://github.com/Chreece/HA-Fitness-Bridge'
+          assert manifest['issue_tracker']=='https://github.com/Chreece/HA-Fitness-Bridge/issues'
+          assert manifest['config_flow'] is True
+          assert 'zeroconf' in manifest['dependencies']
+          assert hacs['name']=='HA-Fitness Bridge'
+          PY
       - name: Build deterministic package
         run: python tools/build_ha_bridge.py --output /tmp/HA-Fitness-Bridge.zip
       - name: Inspect package
@@ -27,17 +54,38 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
-          archive = Path('/tmp/HA-Fitness-Bridge.zip')
+          archive=Path('/tmp/HA-Fitness-Bridge.zip')
           assert archive.is_file() and archive.stat().st_size > 0
           with ZipFile(archive) as zf:
-              names = set(zf.namelist())
-          required = {
+              names=set(zf.namelist())
+          required={
               'custom_components/fitness_bridge/manifest.json',
               'custom_components/fitness_bridge/__init__.py',
-              'hacs.json',
-              'README.md',
-              'LICENSE',
+              'custom_components/fitness_bridge/pairing.py',
+              'custom_components/fitness_bridge/pairing.js',
+              'custom_components/fitness_bridge/brand/icon.png',
+              'hacs.json','README.md','LICENSE',
           }
-          missing = required - names
+          missing=required-names
           assert not missing, f'Missing package files: {sorted(missing)}'
           PY
+
+  hassfest:
+    name: Hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate as HACS integration
+        uses: hacs/action@22.5.0
+        with:
+          category: integration
+          # Topics are repository metadata, not integration/package content. The
+          # connector cannot edit them; every install-relevant HACS check stays on.
+          ignore: topics
