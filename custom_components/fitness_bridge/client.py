@@ -13,6 +13,9 @@ from typing import Any
 import uuid
 
 from aiohttp import ClientError, WSMsgType
+from bleak import BleakClient
+from bleak_retry_connector import establish_connection
+from homeassistant.components.bluetooth import async_ble_device_from_address, async_discovered_service_info
 from homeassistant.components.media_player import MediaPlayerEntityFeature
 from homeassistant.core import EVENT_STATE_CHANGED, HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
@@ -339,6 +342,49 @@ async def _async_stop_dashcast(hass: HomeAssistant, entity_id: str) -> dict[str,
     return {"stopped": True, "entity_id": entity_id}
 
 
+def _bluetooth_proxy_discovery(hass: HomeAssistant) -> list[dict[str, Any]]:
+    """Return HA Bluetooth-manager advertisements, including ESPHome proxies."""
+    rows: list[dict[str, Any]] = []
+    for info in list(async_discovered_service_info(hass))[:512]:
+        address = str(getattr(info, "address", "") or "").strip().upper()
+        if not address:
+            continue
+        manufacturer_data = getattr(info, "manufacturer_data", {}) or {}
+        service_data = getattr(info, "service_data", {}) or {}
+        rows.append({
+            "address": address[:64],
+            "name": str(getattr(info, "name", "") or address)[:160],
+            "rssi": getattr(info, "rssi", None),
+            "source": str(getattr(info, "source", "") or "")[:160],
+            "connectable": bool(getattr(info, "connectable", False)),
+            "service_uuids": [str(value)[:80] for value in list(getattr(info, "service_uuids", None) or [])[:128]],
+            "manufacturer_data": [
+                {"id": int(key), "data": bytes(value or b"")[:2048].hex()}
+                for key, value in list(manufacturer_data.items())[:32]
+                if isinstance(key, int)
+            ],
+            "service_data": [
+                {"uuid": str(key)[:80], "data": bytes(value or b"")[:2048].hex()}
+                for key, value in list(service_data.items())[:64]
+            ],
+        })
+    return rows
+
+
+def _gatt_services_payload(client: BleakClient) -> list[dict[str, Any]]:
+    services = getattr(client, "services", None)
+    result: list[dict[str, Any]] = []
+    for service in list(services or [])[:128]:
+        chars = []
+        for char in list(getattr(service, "characteristics", None) or [])[:256]:
+            chars.append({
+                "uuid": str(getattr(char, "uuid", "") or "")[:80],
+                "properties": [str(value)[:32] for value in list(getattr(char, "properties", None) or [])[:32]],
+            })
+        result.append({"uuid": str(getattr(service, "uuid", "") or "")[:80], "characteristics": chars})
+    return result
+
+
 class FitnessBridgeClient:
     def __init__(
         self,
@@ -368,6 +414,8 @@ class FitnessBridgeClient:
         self._mirror_profile_entities: dict[str, set[str]] = {}
         self._mirror_listeners: set[Callable[[], None]] = set()
         self._fitness_playback: dict[str, tuple[str, str]] = {}
+        self._bluetooth_clients: dict[str, BleakClient] = {}
+        self._bluetooth_addresses: dict[str, str] = {}
 
     @property
     def connected(self) -> bool:
@@ -440,6 +488,110 @@ class FitnessBridgeClient:
         self._notify_mirror_listeners()
         return {"profile_id": profile_id, "cleared": True, "removed": len(entity_ids)}
 
+    async def _bluetooth_disconnect(self, session_id: str) -> dict[str, Any]:
+        session_id = str(session_id or "")
+        client = self._bluetooth_clients.pop(session_id, None)
+        address = self._bluetooth_addresses.pop(session_id, "")
+        if client is not None:
+            try:
+                if getattr(client, "is_connected", False):
+                    await client.disconnect()
+            except Exception:
+                _LOGGER.debug("Bluetooth proxy disconnect failed for %s", address, exc_info=True)
+        return {"session_id": session_id, "address": address, "disconnected": True}
+
+    async def _bluetooth_connect(self, address: str, *, pair: bool = False) -> dict[str, Any]:
+        address = str(address or "").strip().upper()
+        if not address or len(address) > 64:
+            raise ValueError("invalid_bluetooth_address")
+        ble_device = async_ble_device_from_address(self.hass, address, connectable=True)
+        if ble_device is None:
+            raise RuntimeError("bluetooth_device_unavailable")
+        session_id = uuid.uuid4().hex
+
+        def disconnected(_client) -> None:
+            self._bluetooth_clients.pop(session_id, None)
+            self._bluetooth_addresses.pop(session_id, None)
+            self.hass.async_create_task(self._send_json({
+                "type": "bridge/event",
+                "event": "bluetooth_proxy_disconnected",
+                "session_id": session_id,
+                "address": address,
+            }))
+
+        client = await establish_connection(
+            BleakClient,
+            ble_device,
+            str(getattr(ble_device, "name", "") or address),
+            disconnected_callback=disconnected,
+        )
+        try:
+            if pair and hasattr(client, "pair"):
+                await client.pair()
+            self._bluetooth_clients[session_id] = client
+            self._bluetooth_addresses[session_id] = address
+            return {
+                "session_id": session_id,
+                "address": address,
+                "connected": bool(getattr(client, "is_connected", False)),
+                "services": _gatt_services_payload(client),
+            }
+        except Exception:
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+            raise
+
+    def _bluetooth_client(self, session_id: str) -> BleakClient:
+        client = self._bluetooth_clients.get(str(session_id or ""))
+        if client is None or not getattr(client, "is_connected", False):
+            raise RuntimeError("bluetooth_proxy_session_unavailable")
+        return client
+
+    async def _bluetooth_request(self, operation: str, request: dict[str, Any]) -> Any:
+        if operation == "bluetooth/proxy/discover":
+            return {"devices": _bluetooth_proxy_discovery(self.hass)}
+        if operation == "bluetooth/proxy/connect":
+            return await self._bluetooth_connect(str(request.get("address") or ""), pair=bool(request.get("pair", False)))
+        session_id = str(request.get("session_id") or "")
+        if operation == "bluetooth/proxy/disconnect":
+            return await self._bluetooth_disconnect(session_id)
+        client = self._bluetooth_client(session_id)
+        characteristic = str(request.get("characteristic") or "").strip()
+        if not characteristic or len(characteristic) > 80:
+            raise ValueError("invalid_bluetooth_characteristic")
+        if operation == "bluetooth/proxy/read":
+            data = bytes(await client.read_gatt_char(characteristic))
+            return {"data": data[:65536].hex()}
+        if operation == "bluetooth/proxy/write":
+            raw = str(request.get("data") or "")
+            if len(raw) > 131072:
+                raise ValueError("bluetooth_write_too_large")
+            try:
+                data = bytes.fromhex(raw)
+            except ValueError as exc:
+                raise ValueError("invalid_bluetooth_write") from exc
+            await client.write_gatt_char(characteristic, data, response=bool(request.get("response", False)))
+            return {"written": len(data)}
+        if operation == "bluetooth/proxy/notify/start":
+            async def forward(_sender, data: bytearray) -> None:
+                await self._send_json({
+                    "type": "bridge/event",
+                    "event": "bluetooth_proxy_notify",
+                    "session_id": session_id,
+                    "characteristic": characteristic,
+                    "data": bytes(data)[:65536].hex(),
+                })
+            def notify(sender, data) -> None:
+                self.hass.async_create_task(forward(sender, data))
+            await client.start_notify(characteristic, notify)
+            return {"subscribed": True}
+        if operation == "bluetooth/proxy/notify/stop":
+            await client.stop_notify(characteristic)
+            return {"subscribed": False}
+        raise ValueError(f"unsupported bluetooth proxy operation: {operation}")
+
     async def async_start(self) -> None:
         if self._task is not None and not self._task.done():
             return
@@ -450,6 +602,8 @@ class FitnessBridgeClient:
 
     async def async_stop(self) -> None:
         self._stop.set()
+        for session_id in tuple(self._bluetooth_clients):
+            await self._bluetooth_disconnect(session_id)
         if self._ws is not None and not self._ws.closed:
             await self._ws.close()
         if self._task is not None:
@@ -473,7 +627,7 @@ class FitnessBridgeClient:
                     autoclose=True,
                 ) as ws:
                     self._ws = ws
-                    capabilities = ["states", "services", "events", "runtime_catalog", "cast_launch", "media_source", "integration_read"]
+                    capabilities = ["states", "services", "events", "runtime_catalog", "cast_launch", "media_source", "integration_read", "bluetooth_proxy"]
                     # Advertise the implemented transport operation even if HA
                     # is still starting integrations. The live catalog below
                     # gates readiness and can recover without reconnecting.
@@ -524,6 +678,8 @@ class FitnessBridgeClient:
                     _LOGGER.debug("Fitness server bridge disconnected: %s", err)
             finally:
                 self._ws = None
+                for session_id in tuple(self._bluetooth_clients):
+                    await self._bluetooth_disconnect(session_id)
                 self._remove_state_listener()
                 self._notify_mirror_listeners()
             if self._stop.is_set():
@@ -545,7 +701,9 @@ class FitnessBridgeClient:
         request_id = str(request.get("id") or "")
         operation = str(request.get("operation") or "")
         try:
-            if operation == "state/get":
+            if operation.startswith("bluetooth/proxy/"):
+                result = await self._bluetooth_request(operation, request)
+            elif operation == "state/get":
                 entity_id = str(request.get("entity_id") or "").strip()
                 result = _state_payload(self.hass.states.get(entity_id))
             elif operation == "state/list":
