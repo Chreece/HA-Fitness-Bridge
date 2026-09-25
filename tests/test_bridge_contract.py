@@ -127,3 +127,33 @@ def test_media_source_checks_audio_and_keeps_resolved_provider_url_in_ha(monkeyp
         with pytest.raises(PermissionError):
             await client._media_operation("media/play",{"provider":provider,"media_id":provider+"/video","entity_id":"media_player.gym"})
     asyncio.run(run())
+
+
+
+def test_bluetooth_proxy_bridge_uses_home_assistant_managed_ble_route():
+    source = SOURCE.read_text(encoding="utf-8")
+    assert 'async_discovered_service_info' in source
+    assert 'async_ble_device_from_address' in source
+    assert 'establish_connection(' in source
+    assert '"bluetooth_proxy"' in source
+    for operation in (
+        "bluetooth/proxy/discover",
+        "bluetooth/proxy/connect",
+        "bluetooth/proxy/disconnect",
+        "bluetooth/proxy/read",
+        "bluetooth/proxy/write",
+        "bluetooth/proxy/notify/start",
+        "bluetooth/proxy/notify/stop",
+    ):
+        assert operation in source
+    assert '"event": "bluetooth_proxy_notify"' in source
+    assert '"event": "bluetooth_proxy_disconnected"' in source
+
+
+def test_bluetooth_proxy_payload_is_bounded_and_contains_no_ha_credentials():
+    source = SOURCE.read_text(encoding="utf-8")
+    block = source[source.index("def _bluetooth_proxy_discovery"):source.index("def _gatt_services_payload")]
+    assert "manufacturer_data" in block and "service_data" in block
+    assert "[:2048].hex()" in block
+    assert "access_token" not in block
+    assert "token" not in block
