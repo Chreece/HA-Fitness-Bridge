@@ -631,6 +631,8 @@ class FitnessBridgeClient:
                     # Advertise the implemented transport operation even if HA
                     # is still starting integrations. The live catalog below
                     # gates readiness and can recover without reconnecting.
+                    if "tts" in self.allowed_service_domains and self.hass.services.has_service("tts", "speak"):
+                        capabilities.append("tts_audio")
                     if "ai_task" in self.allowed_service_domains:
                         capabilities.append("ai_task")
                     if self.entity_mirror_enabled:
@@ -726,6 +728,8 @@ class FitnessBridgeClient:
                 if not self.hass.services.has_service("ai_task", "generate_data"):
                     result["ai_entities"] = []
                 result["music_providers"] = await self._music_sources()
+            elif operation == "tts/render":
+                result = await self._render_speech(request)
             elif operation == "ai/generate":
                 entity_id = str(request.get("entity_id") or "")
                 instructions = str(request.get("instructions") or "")
@@ -792,7 +796,7 @@ class FitnessBridgeClient:
                 "type": "bridge/response",
                 "id": request_id,
                 "success": True,
-                "result": _json_safe(result),
+                "result": result if operation == "tts/render" else _json_safe(result),
             }
         except Exception as err:
             response = {
@@ -802,6 +806,28 @@ class FitnessBridgeClient:
                 "error": str(err)[:1024],
             }
         await self._send_json(response)
+
+    async def _render_speech(self, request):
+        import base64
+        from homeassistant.components.tts import async_get_media_source_audio
+        from homeassistant.components.tts.media_source import generate_media_source_id
+
+        engine = str(request.get("entity_id") or "")
+        if "tts" not in self.allowed_service_domains or engine not in {
+            row["id"] for row in _runtime_catalog(self.hass)["tts_entities"] if row["available"]
+        }:
+            raise PermissionError("Speech engine unavailable")
+        message = str(request.get("message") or "").strip()
+        if not message or len(message) > 4000:
+            raise ValueError("Invalid speech text")
+        language = str(request.get("language") or "")[:32]
+        source = generate_media_source_id(self.hass, message, engine=engine, language=language or None,
+                                          options={"preferred_format": "mp3"}, cache=False)
+        extension, audio = await async_get_media_source_audio(self.hass, source)
+        mime = {"mp3": "audio/mpeg", "wav": "audio/wav", "ogg": "audio/ogg", "flac": "audio/flac"}.get(extension)
+        if not mime or not audio or len(audio) > 720_000:
+            raise ValueError("Speech audio exceeds the bridge message limit or uses an unsupported format")
+        return {"audio": base64.b64encode(audio).decode("ascii"), "content_type": mime}
 
     async def _music_sources(self):
         from homeassistant.components import media_source

@@ -157,3 +157,34 @@ def test_bluetooth_proxy_payload_is_bounded_and_contains_no_ha_credentials():
     assert "[:2048].hex()" in block
     assert "access_token" not in block
     assert "token" not in block
+
+
+def test_render_speech_returns_complete_audio_for_an_available_engine(monkeypatch):
+    import base64
+    import types
+    audio = b'0123456789' * 6000
+    modules = {name: types.ModuleType(name) for name in (
+        'homeassistant', 'homeassistant.components', 'homeassistant.components.tts',
+        'homeassistant.components.tts.media_source')}
+    for name, module in modules.items():
+        monkeypatch.setitem(sys.modules, name, module)
+    tts = modules['homeassistant.components.tts']
+    source = modules['homeassistant.components.tts.media_source']
+    source.generate_media_source_id = lambda hass, message, **opts: 'media-source://tts/' + opts['engine']
+    tts.async_get_media_source_audio = AsyncMock(return_value=('mp3', audio))
+
+    async def run():
+        _, _, client = stack()
+        request = {'id':'1', 'operation':'tts/render', 'message':'Workout started',
+                   'language':'el', 'entity_id':'tts.cloud'}
+        await client._handle_request(request)
+        result = client._send_json.call_args.args[0]['result']
+        assert result['content_type'] == 'audio/mpeg'
+        assert base64.b64decode(result['audio']) == audio
+        await client._handle_request({**request, 'entity_id':'tts.missing'})
+        assert not client._send_json.call_args.args[0]['success']
+        client.allowed_service_domains.remove('tts')
+        await client._handle_request(request)
+        assert not client._send_json.call_args.args[0]['success']
+        assert tts.async_get_media_source_audio.await_count == 1
+    asyncio.run(run())
