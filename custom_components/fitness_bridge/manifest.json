@@ -1,6 +1,11 @@
 {
   "domain": "fitness_bridge",
   "name": "HA-Fitness Bridge",
+  "after_dependencies": [
+    "bluetooth",
+    "media_player",
+    "tts"
+  ],
   "codeowners": [
     "@Chreece"
   ],
